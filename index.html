@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A bilingual single-player foreign exchange trading simulator with leverage, isolated margin and random markets.">
+  <title>FX Simulator — 外汇交易模拟器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="startScreen" class="start-screen">
+    <div class="start-topbar">
+      <div class="brand brand-dark"><span class="brand-mark">FX</span><span>Simulator</span></div>
+      <button id="startLangBtn" class="button button-ghost" type="button">EN</button>
+    </div>
+    <main class="start-card">
+      <div class="start-intro">
+        <p class="eyebrow" data-i18n="startEyebrow">单人外汇交易模拟</p>
+        <h1 data-i18n="startTitle">选择你的交易规则</h1>
+        <p class="muted" data-i18n="startSubtitle">选择本局资金与交易模式。模式选定后将锁定，直到重新开始。</p>
+      </div>
+      <form id="startForm">
+        <div class="start-capital">
+          <div>
+            <label for="startingCapital" data-i18n="startingCapital">本局初始资金</label>
+            <p class="field-help" data-i18n="startingCapitalHelp">可选 300 万至 2 亿日元；开局汇率将从 20 组历史快照中随机抽取。</p>
+          </div>
+          <select id="startingCapital"></select>
+        </div>
+        <fieldset class="mode-grid">
+          <legend data-i18n="gameMode">游戏模式</legend>
+          <label class="mode-option">
+            <input type="radio" name="gameMode" value="classic" checked>
+            <span class="mode-content">
+              <span class="mode-number">01</span>
+              <strong data-i18n="classicMode">经典模式</strong>
+              <span data-i18n="classicDescription">仅市价开仓与手动平仓，完全依靠自己的判断。</span>
+              <span class="mode-tag" data-i18n="marketOnly">仅市价单</span>
+            </span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="gameMode" value="risk">
+            <span class="mode-content">
+              <span class="mode-number">02</span>
+              <strong data-i18n="riskMode">风控模式</strong>
+              <span data-i18n="riskDescription">在市价交易基础上，可随时添加、修改或取消止盈止损。</span>
+              <span class="mode-tag" data-i18n="marketRisk">市价单＋止盈止损</span>
+            </span>
+          </label>
+        </fieldset>
+        <div class="start-deposit">
+          <div>
+            <label for="initialDeposit" data-i18n="initialDeposit">初始投入交易账户</label>
+            <p class="field-help" data-i18n="initialDepositHelp">剩余资金保留在钱包，之后可随时追加或提取。</p>
+          </div>
+          <div class="money-input">
+            <span>¥</span>
+            <input id="initialDeposit" type="number" min="0" max="100000000" step="100000" value="10000000" required>
+          </div>
+          <div class="deposit-shortcuts" aria-label="Initial deposit shortcuts">
+            <button type="button" data-deposit-percent="10">10%</button>
+            <button type="button" data-deposit-percent="15">15%</button>
+            <button type="button" data-deposit-percent="50">50%</button>
+            <button type="button" data-deposit-percent="75">75%</button>
+            <button type="button" data-deposit-percent="100">100%</button>
+          </div>
+          <div class="range-labels"><span>¥0</span><span id="depositMaxLabel">¥100,000,000</span></div>
+          <input id="initialDepositRange" type="range" min="0" max="100000000" step="100000" value="10000000" aria-label="Initial deposit">
+        </div>
+        <p id="startError" class="form-error" role="alert"></p>
+        <button class="button button-primary button-large" type="submit" data-i18n="startGame">开始新游戏</button>
+      </form>
+      <div class="snapshot-note">
+        <span class="status-dot"></span>
+        <span data-i18n="snapshotNote">每局随机选择一组 ECB 历史参考汇率；之后全部为随机模拟，不连接真实市场。</span>
+      </div>
+    </main>
+  </section>
+
+  <section id="gameScreen" class="game-screen hidden">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand"><span class="brand-mark">FX</span><span>Simulator</span></div>
+        <span id="modeBadge" class="mode-badge"></span>
+        <span id="capitalBadge" class="mode-badge"></span>
+      </div>
+      <div class="header-actions">
+        <span class="save-status"><span class="status-dot"></span><span data-i18n="localSave">本地自动存档</span></span>
+        <button id="langBtn" class="button header-button" type="button">EN</button>
+        <button id="resetBtn" class="button header-button danger-text" type="button" data-i18n="restart">重新开始</button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="account-grid" aria-label="Account summary">
+        <article class="account-card"><span data-i18n="wallet">钱包余额</span><strong id="walletValue">—</strong><small data-i18n="walletHint">可用于追加资金</small></article>
+        <article class="account-card"><span data-i18n="availableBalance">交易可用余额</span><strong id="balanceValue">—</strong><small data-i18n="availableHint">可开仓或提取</small></article>
+        <article class="account-card"><span data-i18n="marginUsed">已占用保证金</span><strong id="marginValue">—</strong><small data-i18n="marginHint">逐仓独立计算</small></article>
+        <article class="account-card"><span data-i18n="unrealizedPnl">未实现盈亏</span><strong id="unrealizedValue">—</strong><small data-i18n="unrealizedHint">按当前价格折算日元</small></article>
+        <article class="account-card account-card-debt"><span data-i18n="totalDebt">贷款总负债</span><strong id="debtValue">—</strong><small data-i18n="debtHint">未还本金＋累计利息</small></article>
+        <article class="account-card account-card-primary"><span data-i18n="netWorth">总净资产</span><strong id="netWorthValue">—</strong><small data-i18n="netWorthHint">钱包＋交易净值－债务</small></article>
+      </section>
+
+      <nav id="marketTabs" class="market-tabs" aria-label="Currency pairs"></nav>
+
+      <div class="trading-layout">
+        <section class="panel chart-panel">
+          <div class="panel-header chart-header">
+            <div>
+              <div class="instrument-title"><h2 id="chartSymbol">USD/JPY</h2><span class="simulation-badge" data-i18n="simulated">模拟行情</span></div>
+              <div class="price-line"><strong id="chartPrice">—</strong><span id="chartChange">—</span></div>
+            </div>
+            <div class="time-controls" aria-label="Simulation controls">
+              <button id="pauseBtn" class="button control-button" type="button" data-i18n="pause">暂停</button>
+              <button id="normalSpeedBtn" class="button control-button active" type="button">1×</button>
+              <button id="fastSpeedBtn" class="button control-button" type="button">1.5×</button>
+            </div>
+          </div>
+          <div class="chart-meta">
+            <span id="candleInfo">—</span>
+            <span id="chartTime">—</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartCanvas" aria-label="Candlestick chart"></canvas>
+          </div>
+          <div class="chart-legend">
+            <span><i class="legend-line entry-line"></i><span data-i18n="entryPrice">开仓价</span></span>
+            <span><i class="legend-line liquidation-line"></i><span data-i18n="liquidationPrice">爆仓线</span></span>
+            <span class="risk-only"><i class="legend-line stop-line"></i><span data-i18n="stopLoss">止损</span></span>
+            <span class="risk-only"><i class="legend-line take-line"></i><span data-i18n="takeProfit">止盈</span></span>
+            <span class="legend-hint" data-i18n="chartHint">点击仓位可高亮对应价格线</span>
+          </div>
+        </section>
+
+        <aside class="side-column">
+          <section class="panel trade-panel">
+            <div class="panel-header"><div><p class="eyebrow" data-i18n="newOrder">新建订单</p><h2 data-i18n="marketOrder">市价开仓</h2></div><span id="tradePair" class="pair-chip">USD/JPY</span></div>
+            <div class="segmented-control">
+              <button id="tradeSideLong" class="side-button long active" type="button" data-i18n="buyLong">买入 / 做多</button>
+              <button id="tradeSideShort" class="side-button short" type="button" data-i18n="sellShort">卖出 / 做空</button>
+            </div>
+            <label class="field-label" for="marginInput"><span data-i18n="marginAmount">保证金（日元）</span><small id="availableForTrade">—</small></label>
+            <div class="money-input compact"><span>¥</span><input id="marginInput" type="number" min="100" step="10000" value="1000000"></div>
+            <div class="quick-amounts">
+              <button type="button" data-amount="100000" data-zh="10万" data-en="100K">10万</button><button type="button" data-amount="1000000" data-zh="100万" data-en="1M">100万</button><button type="button" data-amount="10000000" data-zh="1000万" data-en="10M">1000万</button><button type="button" data-amount="max">MAX</button>
+            </div>
+            <label class="field-label" for="leverageInput"><span data-i18n="leverage">杠杆倍数</span><small>1–1000×</small></label>
+            <div class="leverage-row"><input id="leverageRange" type="range" min="1" max="1000" value="20"><input id="leverageInput" class="leverage-input" type="number" min="1" max="1000" value="20"><span>×</span></div>
+            <div class="quick-leverage" aria-label="Quick leverage">
+              <button type="button" data-leverage="10">10X</button><button type="button" data-leverage="50">50X</button><button type="button" data-leverage="100">100X</button><button type="button" data-leverage="200">200X</button><button type="button" data-leverage="500">500X</button><button type="button" data-leverage="1000">1000X</button>
+            </div>
+            <dl class="order-estimate">
+              <div><dt data-i18n="estimatedNotional">名义仓位</dt><dd id="estimatedNotional">—</dd></div>
+              <div><dt data-i18n="estimatedUnits">基础货币数量</dt><dd id="estimatedUnits">—</dd></div>
+              <div><dt data-i18n="estimatedLiquidation">预计爆仓价</dt><dd id="estimatedLiquidation">—</dd></div>
+            </dl>
+            <p class="fee-note" data-i18n="feeNote">仅对平仓盈利部分收取 0.5% 手续费；亏损平仓不收手续费。</p>
+            <p id="tradeError" class="form-error" role="alert"></p>
+            <button id="openPositionBtn" class="button button-primary open-button" type="button">—</button>
+          </section>
+        </aside>
+      </div>
+
+      <section class="panel positions-panel">
+        <div class="panel-header"><div><p class="eyebrow" data-i18n="openPositionsEyebrow">当前交易</p><h2><span data-i18n="openPositions">持仓列表</span> <span id="positionCount" class="count-badge">0</span></h2></div><span class="muted small" data-i18n="isolatedMargin">每笔仓位独立保证金，亏完全部保证金时强平</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th data-i18n="market">市场 / 方向</th><th data-i18n="marginLeverage">保证金 / 杠杆</th><th data-i18n="entryCurrent">开仓价 / 当前价</th><th data-i18n="liquidationPrice">爆仓线</th><th data-i18n="pnlRoe">盈亏 / 收益率</th><th data-i18n="actions">操作</th></tr></thead>
+            <tbody id="positionsBody"></tbody>
+          </table>
+          <div id="positionsEmpty" class="empty-state" data-i18n="noPositions">暂无持仓。选择方向、保证金和杠杆后即可开仓。</div>
+        </div>
+        <div id="riskEditor" class="risk-editor hidden">
+          <div class="risk-editor-heading"><div><p class="eyebrow" data-i18n="selectedPosition">选中仓位</p><h3 id="riskPositionTitle">—</h3></div><p class="muted small" data-i18n="riskHint">留空表示不设置；止盈止损必须在当前价格的正确一侧。</p></div>
+          <div class="risk-fields">
+            <label><span data-i18n="stopLossPrice">止损价</span><input id="stopLossInput" type="number" min="0" step="any" placeholder="—"></label>
+            <label><span data-i18n="takeProfitPrice">止盈价</span><input id="takeProfitInput" type="number" min="0" step="any" placeholder="—"></label>
+            <button id="saveRiskBtn" class="button button-primary" type="button" data-i18n="saveRisk">保存止盈止损</button>
+            <button id="clearRiskBtn" class="button button-secondary" type="button" data-i18n="clearRisk">清除</button>
+          </div>
+          <p id="riskError" class="form-error" role="alert"></p>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card"><span data-i18n="closedTrades">已平仓交易</span><strong id="statTrades">0</strong></article>
+        <article class="stat-card"><span data-i18n="winRate">胜率</span><strong id="statWinRate">0%</strong></article>
+        <article class="stat-card"><span data-i18n="realizedPnl">已实现净盈亏</span><strong id="statRealized">¥0</strong></article>
+        <article class="stat-card"><span data-i18n="totalFees">累计手续费</span><strong id="statFees">¥0</strong></article>
+        <article class="stat-card"><span data-i18n="liquidations">爆仓次数</span><strong id="statLiquidations">0</strong></article>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-header"><div><p class="eyebrow" data-i18n="auditTrail">交易记录</p><h2 data-i18n="tradeHistory">平仓历史</h2></div><span class="muted small" data-i18n="historyHint">保留最近 500 笔记录</span></div>
+        <div class="table-wrap history-table">
+          <table>
+            <thead><tr><th data-i18n="closeTime">平仓时间</th><th data-i18n="market">市场 / 方向</th><th data-i18n="entryExit">开仓 / 平仓</th><th data-i18n="grossPnl">盈亏（费前）</th><th data-i18n="fee">手续费</th><th data-i18n="netPnl">净盈亏</th><th data-i18n="closeReason">平仓原因</th></tr></thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <div id="historyEmpty" class="empty-state" data-i18n="noHistory">暂无平仓记录。</div>
+        </div>
+      </section>
+
+      <section class="panel transfer-panel transfer-panel-bottom">
+        <div class="panel-header"><div><p class="eyebrow" data-i18n="fundManagement">资金管理</p><h2 data-i18n="fundTransfer">资金划转</h2></div></div>
+        <div class="transfer-body">
+          <div class="transfer-input-group">
+            <label class="field-label" for="transferAmount"><span data-i18n="transferAmount">划转金额（日元）</span></label>
+            <div class="money-input compact"><span>¥</span><input id="transferAmount" type="number" min="0.01" step="100000" value="1000000"></div>
+            <div class="shortcut-row transfer-shortcuts">
+              <button type="button" data-transfer-amount="100000" data-zh="10万" data-en="100K">10万</button>
+              <button type="button" data-transfer-amount="1000000" data-zh="100万" data-en="1M">100万</button>
+              <button type="button" data-transfer-amount="10000000" data-zh="1000万" data-en="10M">1000万</button>
+              <button type="button" data-transfer-max="wallet" data-zh="钱包 MAX" data-en="Wallet MAX">钱包 MAX</button>
+              <button type="button" data-transfer-max="balance" data-zh="账户 MAX" data-en="Trading MAX">账户 MAX</button>
+            </div>
+          </div>
+          <div class="transfer-actions"><button id="depositBtn" class="button button-secondary" type="button" data-i18n="deposit">钱包 → 交易账户</button><button id="withdrawBtn" class="button button-secondary" type="button" data-i18n="withdraw">交易账户 → 钱包</button></div>
+        </div>
+        <p id="transferError" class="form-error" role="alert"></p>
+      </section>
+
+      <section class="panel loan-panel">
+        <div class="panel-header"><div><p class="eyebrow" data-i18n="debtManagement">债务管理</p><h2 data-i18n="loans">贷款</h2></div><span id="loanSummary" class="pair-chip">—</span></div>
+        <p class="loan-rule" data-i18n="loanRule">未还本金上限由本局初始资金决定；每 120 模拟秒按当前债务复利 10%，每笔贷款须在 600 模拟秒内还清。</p>
+        <div class="loan-actions">
+          <div class="loan-action-box">
+            <label class="field-label" for="loanAmount"><span data-i18n="borrowAmount">借款金额（日元）</span><small id="loanCreditAvailable">—</small></label>
+            <div class="money-input compact"><span>¥</span><input id="loanAmount" type="number" min="1000" max="500000000" step="1000000" value="10000000"></div>
+            <div class="shortcut-row loan-shortcuts">
+              <button type="button" data-loan-amount="1000000" data-zh="100万" data-en="1M">100万</button>
+              <button type="button" data-loan-amount="10000000" data-zh="1000万" data-en="10M">1000万</button>
+              <button type="button" data-loan-amount="100000000" data-zh="1亿" data-en="100M">1亿</button>
+              <button type="button" data-loan-max="credit">MAX</button>
+            </div>
+            <button id="borrowBtn" class="button button-primary" type="button" data-i18n="borrow">借入并存入钱包</button>
+          </div>
+          <div class="loan-action-box">
+            <label class="field-label" for="repaymentAmount"><span data-i18n="repaymentAmount">还款金额（日元）</span><small id="repaymentAvailable">—</small></label>
+            <div class="money-input compact"><span>¥</span><input id="repaymentAmount" type="number" min="0.01" step="1000000" value="10000000"></div>
+            <div class="shortcut-row repayment-shortcuts">
+              <button type="button" data-repayment-amount="1000000" data-zh="100万" data-en="1M">100万</button>
+              <button type="button" data-repayment-amount="10000000" data-zh="1000万" data-en="10M">1000万</button>
+              <button type="button" data-repayment-amount="100000000" data-zh="1亿" data-en="100M">1亿</button>
+              <button type="button" data-repayment-max="available">MAX</button>
+            </div>
+            <div class="repayment-buttons"><button id="repayBtn" class="button button-secondary" type="button" data-i18n="repay">部分还款</button><button id="repayAllBtn" class="button button-secondary" type="button" data-i18n="repayAll">还清全部债务</button></div>
+          </div>
+        </div>
+        <p class="repayment-note" data-i18n="repaymentNote">还款依次使用钱包和交易账户可用余额；到期时自动平仓并尝试足额还款，不足则游戏结束。</p>
+        <p id="loanError" class="form-error" role="alert"></p>
+        <div class="table-wrap loan-table">
+          <table>
+            <thead><tr><th data-i18n="loanId">贷款</th><th data-i18n="outstandingPrincipal">未还本金</th><th data-i18n="accruedInterest">累计利息</th><th data-i18n="currentDebt">当前债务</th><th data-i18n="nextInterest">下次计息</th><th data-i18n="timeRemaining">剩余期限</th></tr></thead>
+            <tbody id="loansBody"></tbody>
+          </table>
+          <div id="loansEmpty" class="empty-state" data-i18n="noLoans">当前没有未偿还贷款。</div>
+        </div>
+      </section>
+
+      <footer class="app-footer"><span data-i18n="disclaimer">仅供游戏与学习，不构成投资建议。所有后续行情均为随机生成。</span><span id="snapshotLabel">ECB snapshot</span></footer>
+    </main>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="gameOverOverlay" class="game-over-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="gameOverTitle">
+    <div class="game-over-card">
+      <p id="gameOverReasonLabel" class="eyebrow" data-i18n="debtDefault">债务违约</p>
+      <h2 id="gameOverTitle" data-i18n="gameOverTitle">本局游戏结束</h2>
+      <p id="gameOverMessage">—</p>
+      <p id="gameOverHintText" class="muted" data-i18n="gameOverHint">贷款到期时，自动平仓后的可用资金仍不足以偿还债务。</p>
+      <button id="gameOverRestart" class="button button-primary button-large" type="button" data-i18n="restart">重新开始</button>
+    </div>
+  </div>
+  <div class="made-by">Made by Jerry Cao</div>
+  <script src="js/data.js" defer></script>
+  <script src="js/engine.js" defer></script>
+  <script src="js/app.js" defer></script>
+</body>
+</html>

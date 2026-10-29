@@ -1,0 +1,11 @@
+{
+  "name": "fx-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A bilingual single-player FX trading simulator with random markets and isolated-margin positions.",
+  "scripts": {
+    "test": "node tests/engine.test.js",
+    "test:ui": "node tests/browser-smoke.js",
+    "check": "node --check js/data.js && node --check js/engine.js && node --check js/app.js && node --check tests/browser-smoke.js"
+  }
+}
