@@ -23,6 +23,7 @@
     if (pair.quote === "JPY") return 1;
     if (pair.quote === "USD") return prices["USD/JPY"];
     if (pair.quote === "CNY") return prices["HKD/JPY"] / prices["HKD/CNY"];
+    if (pair.quote === "AUD") return 1 / prices["JPY/AUD"];
     throw new Error("Unsupported quote currency: " + pair.quote);
   }
 
@@ -147,6 +148,7 @@
       history: [],
       loans: [],
       nextLoanId: 1,
+      rescueUsed: false,
       status: "playing",
       gameOverReason: null,
       gameOverAt: null,
@@ -178,6 +180,7 @@
     });
     state.loans = Array.isArray(state.loans) ? state.loans : [];
     state.nextLoanId = Number(state.nextLoanId) || 1;
+    state.rescueUsed = Boolean(state.rescueUsed);
     state.status = state.status || "playing";
     state.gameOverReason = state.gameOverReason || null;
     state.gameOverAt = state.gameOverAt || null;
@@ -228,6 +231,18 @@
     state.balance = roundMoney(state.balance - margin);
     state.positions.push(position);
     return { ok: true, position };
+  }
+
+  function addMargin(state, positionId, rawAmount) {
+    if (state.status === "gameOver") return { ok: false, error: "gameOver" };
+    const position = state.positions.find((item) => item.id === Number(positionId));
+    if (!position) return { ok: false, error: "positionNotFound" };
+    const amount = roundMoney(Number(rawAmount));
+    if (!Number.isFinite(amount) || amount < Data.minTradeMargin) return { ok: false, error: "invalidMargin" };
+    if (amount > state.balance) return { ok: false, error: "insufficientBalance" };
+    state.balance = roundMoney(state.balance - amount);
+    position.margin = roundMoney(position.margin + amount);
+    return { ok: true, position, amount };
   }
 
   function closePosition(state, positionId, reason) {
@@ -349,6 +364,32 @@
     return { ok: true, loan };
   }
 
+  function stealMoney(state) {
+    if (state.rescueUsed) return { ok: false, error: "rescueAlreadyUsed" };
+    if (state.status !== "gameOver") return { ok: false, error: "rescueUnavailable" };
+    const amount = 3000000;
+    const loan = {
+      id: state.nextLoanId++,
+      principal: amount,
+      interest: 0,
+      borrowedAt: state.simTime,
+      nextInterestAt: null,
+      dueAt: null,
+      noInterest: true,
+      lowestPriority: true,
+      source: "kurumiFather"
+    };
+    state.loans.push(loan);
+    state.wallet = roundMoney(state.wallet + amount);
+    state.rescueUsed = true;
+    state.status = "playing";
+    state.gameOverReason = null;
+    state.gameOverAt = null;
+    state.gameOverDebt = 0;
+    state.gameOverCash = 0;
+    return { ok: true, loan, amount };
+  }
+
   function repayDebt(state, rawAmount) {
     if (state.status === "gameOver") return { ok: false, error: "gameOver" };
     if (!state.loans.length) return { ok: false, error: "noDebt" };
@@ -358,7 +399,14 @@
     if (requested > available) return { ok: false, error: "insufficientRepayment" };
     let remaining = Math.min(requested, loanTotals(state).debt);
     const target = remaining;
-    const orderedLoans = state.loans.slice().sort((a, b) => a.dueAt - b.dueAt || a.id - b.id);
+    const orderedLoans = state.loans.slice().sort((a, b) => {
+      const aPriority = a.noInterest || a.lowestPriority ? 1 : 0;
+      const bPriority = b.noInterest || b.lowestPriority ? 1 : 0;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      const aDue = Number.isFinite(a.dueAt) ? a.dueAt : Number.MAX_SAFE_INTEGER;
+      const bDue = Number.isFinite(b.dueAt) ? b.dueAt : Number.MAX_SAFE_INTEGER;
+      return aDue - bDue || a.id - b.id;
+    });
     orderedLoans.forEach((loan) => {
       if (remaining <= 0) return;
       const debt = roundMoney(loan.principal + loan.interest);
@@ -381,7 +429,8 @@
     const result = { interestCount: 0, closedPositions: 0, settledLoanIds: [], gameOver: false };
     if (state.status === "gameOver") return result;
     state.loans.forEach((loan) => {
-      while (loan.nextInterestAt <= state.simTime) {
+      if (loan.noInterest) return;
+      while (Number.isFinite(loan.nextInterestAt) && loan.nextInterestAt <= state.simTime) {
         const debt = loan.principal + loan.interest;
         loan.interest = roundMoney(debt * (1 + Data.loanInterestRate) - loan.principal);
         loan.nextInterestAt += Data.loanInterestInterval * 1000;
@@ -389,7 +438,7 @@
       }
     });
     const dueLoans = state.loans
-      .filter((loan) => loan.dueAt <= state.simTime)
+      .filter((loan) => !loan.noInterest && Number.isFinite(loan.dueAt) && loan.dueAt <= state.simTime)
       .sort((a, b) => a.dueAt - b.dueAt || a.id - b.id);
     if (dueLoans.length && state.positions.length) {
       result.closedPositions = closeAllPositions(state, "debtSettlement").length;
@@ -551,6 +600,7 @@
     createGame,
     migrateState,
     openPosition,
+    addMargin,
     closePosition,
     closeAllPositions,
     transfer,
@@ -558,6 +608,7 @@
     loanTotals,
     checkCriticalFunds,
     borrowLoan,
+    stealMoney,
     repayDebt,
     processLoans,
     setRiskLevels,

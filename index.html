@@ -23,7 +23,7 @@
         <div class="start-capital">
           <div>
             <label for="startingCapital" data-i18n="startingCapital">本局初始资金</label>
-            <p class="field-help" data-i18n="startingCapitalHelp">可选 300 万至 2 亿日元；开局汇率将从 20 组历史快照中随机抽取。</p>
+            <p class="field-help" data-i18n="startingCapitalHelp">可选 30 万至 2 亿日元；开局汇率将从 20 组历史快照中随机抽取。</p>
           </div>
           <select id="startingCapital"></select>
         </div>
@@ -170,6 +170,24 @@
           </table>
           <div id="positionsEmpty" class="empty-state" data-i18n="noPositions">暂无持仓。选择方向、保证金和杠杆后即可开仓。</div>
         </div>
+        <div id="marginEditor" class="margin-editor hidden">
+          <div class="margin-editor-heading">
+            <div><p class="eyebrow" data-i18n="positionSupport">仓位管理</p><h3 id="marginPositionTitle">—</h3></div>
+            <p class="muted small" data-i18n="addMarginHint">追加保证金不会改变持仓数量；做多强平线下降，做空强平线上升，降低强平风险。</p>
+          </div>
+          <div class="margin-editor-controls">
+            <label for="additionalMargin"><span data-i18n="additionalMargin">追加保证金（日元）</span><small id="availableForAdditionalMargin">—</small></label>
+            <div class="money-input compact"><span>¥</span><input id="additionalMargin" type="number" min="100" step="100000" value="1000000"></div>
+            <div class="shortcut-row additional-margin-shortcuts">
+              <button type="button" data-additional-margin="100000" data-zh="10万" data-en="100K">10万</button>
+              <button type="button" data-additional-margin="1000000" data-zh="100万" data-en="1M">100万</button>
+              <button type="button" data-additional-margin="10000000" data-zh="1000万" data-en="10M">1000万</button>
+              <button type="button" data-additional-margin-max="balance">MAX</button>
+            </div>
+            <button id="addMarginBtn" class="button button-primary" type="button" data-i18n="addMargin">追加到选中仓位</button>
+          </div>
+          <p id="marginError" class="form-error" role="alert"></p>
+        </div>
         <div id="riskEditor" class="risk-editor hidden">
           <div class="risk-editor-heading"><div><p class="eyebrow" data-i18n="selectedPosition">选中仓位</p><h3 id="riskPositionTitle">—</h3></div><p class="muted small" data-i18n="riskHint">留空表示不设置；止盈止损必须在当前价格的正确一侧。</p></div>
           <div class="risk-fields">
@@ -270,6 +288,7 @@
       <p id="gameOverMessage">—</p>
       <p id="gameOverHintText" class="muted" data-i18n="gameOverHint">贷款到期时，自动平仓后的可用资金仍不足以偿还债务。</p>
       <button id="gameOverRestart" class="button button-primary button-large" type="button" data-i18n="restart">重新开始</button>
+      <button id="stealMoneyBtn" class="button steal-button hidden" type="button" data-i18n="stealMoney">从久留美的父亲那里偷钱</button>
     </div>
   </div>
   <div class="made-by">Made by Jerry Cao</div>

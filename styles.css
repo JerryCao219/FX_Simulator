@@ -103,7 +103,7 @@ input[type="range"] { width: 100%; accent-color: var(--blue); }
 .account-card-debt { border-color: #ead2aa; background: #fffaf0; }
 .account-card-debt strong { color: #9a5b13; }
 
-.market-tabs { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
+.market-tabs { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; margin-bottom: 16px; }
 .market-tab { min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); text-align: left; transition: border-color 0.15s, background 0.15s; }
 .market-tab:hover { border-color: #b7c2d0; }
 .market-tab.active { border-color: var(--blue); background: var(--blue-soft); }
@@ -209,6 +209,14 @@ td strong { font-size: 12px; }
 .close-button { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; background: white; color: var(--ink); font-size: 11px; }
 .close-button:hover { border-color: var(--red); color: var(--red); }
 .empty-state { padding: 34px 20px; color: var(--muted); font-size: 12px; text-align: center; }
+.margin-editor { margin: 0 16px 16px; padding: 16px; border: 1px solid #c9d9fa; border-radius: 9px; background: var(--surface-soft); }
+.margin-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 12px; }
+.margin-editor-heading p { margin-bottom: 0; }
+.margin-editor-controls { max-width: 520px; }
+.margin-editor-controls > label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; }
+.margin-editor-controls > label small { color: var(--muted); font-weight: 400; }
+.margin-editor-controls > .button { margin-top: 10px; }
+.margin-editor .form-error { margin-bottom: 0; }
 .risk-editor { margin: 0 16px 16px; padding: 16px; border: 1px solid #c9d9fa; border-radius: 9px; background: var(--blue-soft); }
 .risk-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 12px; }
 .risk-editor-heading p { margin-bottom: 0; }
@@ -230,6 +238,8 @@ td strong { font-size: 12px; }
 .game-over-card h2 { margin-bottom: 14px; color: #9a3033; font-size: 28px; }
 .game-over-card > p:not(.eyebrow) { line-height: 1.7; }
 .game-over-card .button { margin-top: 12px; }
+.steal-button { width: 100%; border-color: #d6a34a; background: #fff8e8; color: #8a4f0b; }
+.steal-button:hover { background: #ffefd0; }
 .made-by { position: fixed; z-index: 90; right: 14px; bottom: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.86); color: #687386; font-size: 11px; pointer-events: none; }
 
 @media (max-width: 1200px) {
@@ -273,7 +283,7 @@ td strong { font-size: 12px; }
   .chart-legend { gap: 9px; }
   .panel-header { padding: 14px; }
   .positions-panel .panel-header .muted { display: none; }
-  .risk-editor-heading { flex-direction: column; gap: 5px; }
+  .risk-editor-heading, .margin-editor-heading { flex-direction: column; gap: 5px; }
   .risk-fields { grid-template-columns: 1fr; }
   .transfer-body { grid-template-columns: 1fr; gap: 10px; }
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

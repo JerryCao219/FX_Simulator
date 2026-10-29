@@ -6,6 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const Engine = require("../js/engine.js");
 
 const root = path.resolve(__dirname, "..");
 const chromePath = process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
@@ -125,7 +126,7 @@ async function main() {
   check("new-game screen renders", await evaluate("!document.getElementById('startScreen').classList.contains('hidden')", sessionId));
   check("creator credit is fixed at the bottom-right", await evaluate("var c=document.querySelector('.made-by'); c.textContent==='Made by Jerry Cao' && getComputedStyle(c).position==='fixed' && getComputedStyle(c).right==='14px' && getComputedStyle(c).bottom==='10px'", sessionId));
   check("both game modes are available", await evaluate("document.querySelectorAll('input[name=gameMode]').length === 2", sessionId));
-  check("six starting-capital choices are available", await evaluate("document.querySelectorAll('#startingCapital option').length === 6", sessionId));
+  check("seven starting-capital choices including ¥300K are available", await evaluate("document.querySelectorAll('#startingCapital option').length === 7 && document.querySelector('#startingCapital option[value=\"300000\"]') !== null", sessionId));
   await evaluate("var c=document.getElementById('startingCapital'); c.value='20000000'; c.dispatchEvent(new Event('change'));", sessionId);
   const depositShortcuts = await evaluate("var values=[]; [10,15,50,75,100].forEach(p => { document.querySelector('[data-deposit-percent=\"'+p+'\"]').click(); values.push(document.getElementById('initialDeposit').value); }); values.join(',')", sessionId);
   check("all five deposit shortcuts use the selected starting capital", depositShortcuts === "2000000,3000000,10000000,15000000,20000000");
@@ -137,7 +138,7 @@ async function main() {
   check("a historical starting-rate snapshot is selected", await evaluate("FXData.snapshots.some(s => s.date === JSON.parse(localStorage.getItem('fx-simulator-save-v1')).snapshotDate)", sessionId));
   check("exactly 20 ECB snapshots are built in", await evaluate("FXData.snapshots.length === 20", sessionId));
   check("profitable-close fee is displayed as 0.5%", await evaluate("document.querySelector('.fee-note').textContent.includes('0.5%')", sessionId));
-  check("all nine markets are displayed", await evaluate("document.querySelectorAll('#marketTabs .market-tab').length === 9", sessionId));
+  check("all ten markets including JPY/AUD are displayed", await evaluate("document.querySelectorAll('#marketTabs .market-tab').length === 10 && document.querySelector('[data-symbol=\"JPY/AUD\"]') !== null", sessionId));
   check("fund transfer is below history and positions", await evaluate("var h=document.querySelector('.history-panel'); var p=document.querySelector('.positions-panel'); var f=document.querySelector('.transfer-panel-bottom'); Boolean((h.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING) && (p.compareDocumentPosition(f)&Node.DOCUMENT_POSITION_FOLLOWING))", sessionId));
   check("game screen is visible", await evaluate("!document.getElementById('gameScreen').classList.contains('hidden')", sessionId));
   check("chart hides market-phase labels", await evaluate("!/(上涨阶段|下跌阶段|震荡阶段|Upward phase|Downward phase|Sideways phase)/.test(document.getElementById('chartTime').textContent)", sessionId));
@@ -147,6 +148,10 @@ async function main() {
   let saved = await evaluate("JSON.parse(localStorage.getItem('fx-simulator-save-v1'))", sessionId);
   check("margin shortcuts do not alter selected 1000× leverage", saved.positions.length === 1 && saved.balance === 9000000 && saved.positions[0].leverage === 1000);
   check("position table and liquidation level render", await evaluate("document.querySelectorAll('#positionsBody tr').length===1 && document.getElementById('positionsBody').textContent.includes('1000')", sessionId));
+  await evaluate("document.querySelector('[data-additional-margin-max]').click()", sessionId);
+  check("additional-margin MAX uses available trading cash", await evaluate("document.getElementById('additionalMargin').value==='9000000'", sessionId));
+  const marginMoved = await evaluate("var marginState=JSON.parse(localStorage.getItem('fx-simulator-save-v1')); var oldLine=FXEngine.liquidationPrice(marginState.positions[0],FXEngine.currentPrices(marginState)); document.getElementById('additionalMargin').value=500000; document.getElementById('addMarginBtn').click(); var updatedState=JSON.parse(localStorage.getItem('fx-simulator-save-v1')); var newLine=FXEngine.liquidationPrice(updatedState.positions[0],FXEngine.currentPrices(updatedState)); updatedState.positions[0].margin===1500000 && updatedState.balance===8500000 && newLine<oldLine", sessionId);
+  check("adding margin lowers the long liquidation line", marginMoved);
 
   await evaluate("var s=JSON.parse(localStorage.getItem('fx-simulator-save-v1')); var p=s.markets['USD/JPY'].price; document.getElementById('stopLossInput').value=p-1; document.getElementById('takeProfitInput').value=p+1; document.getElementById('saveRiskBtn').click();", sessionId);
   saved = await evaluate("JSON.parse(localStorage.getItem('fx-simulator-save-v1'))", sessionId);
@@ -200,10 +205,47 @@ async function main() {
   check("custom capital and HKD/CNY work in classic mode", saved.mode === "classic" && saved.startingCash === 3000000 && saved.positions.length === 1 && saved.positions[0].symbol === "HKD/CNY" && await evaluate("document.getElementById('riskEditor').classList.contains('hidden')", sessionId));
   await evaluate("document.querySelector('[data-loan-max]').click()", sessionId);
   check("3M starting capital has a 30M loan MAX", await evaluate("document.getElementById('loanAmount').value==='30000000'", sessionId));
-  await evaluate("document.getElementById('loanAmount').value=1000; document.getElementById('borrowBtn').click(); document.getElementById('transferAmount').value=1000; document.getElementById('depositBtn').click(); document.querySelector('[data-amount=\"max\"]').click(); document.getElementById('openPositionBtn').click();", sessionId);
+  await evaluate("document.getElementById('loanAmount').value=1000; document.getElementById('borrowBtn').click(); document.getElementById('transferAmount').value=1000; document.getElementById('depositBtn').click(); document.querySelector('[data-symbol=\"JPY/AUD\"]').click(); document.querySelector('[data-amount=\"max\"]').click(); document.getElementById('openPositionBtn').click();", sessionId);
   saved = await evaluate("JSON.parse(localStorage.getItem('fx-simulator-save-v1'))", sessionId);
+  check("JPY/AUD positions can be opened", saved.positions.some((position) => position.symbol === "JPY/AUD"));
   check("open-position equity prevents a false bankruptcy popup", saved.status === "playing" && saved.gameOverCash === 0 && await evaluate("document.getElementById('gameOverOverlay').classList.contains('hidden')", sessionId));
   check("no uncaught browser runtime errors", runtimeErrors.length === 0);
+
+  const rescueState = Engine.createGame("classic", 300000, Date.now(), () => 0.5, 300000);
+  rescueState.wallet = 0;
+  rescueState.balance = 0;
+  rescueState.loans = [{
+    id: 1,
+    principal: 1000,
+    interest: 0,
+    borrowedAt: rescueState.simTime,
+    nextInterestAt: rescueState.simTime + 120000,
+    dueAt: rescueState.simTime + 600000
+  }];
+  rescueState.nextLoanId = 2;
+  rescueState.status = "gameOver";
+  rescueState.gameOverReason = "insufficientFunds";
+  rescueState.gameOverAt = rescueState.simTime;
+  rescueState.gameOverDebt = 1000;
+  rescueState.gameOverCash = 0;
+  const rescueTarget = await send("Target.createTarget", { url: "about:blank" });
+  const rescueAttach = await send("Target.attachToTarget", { targetId: rescueTarget.targetId, flatten: true });
+  const rescueSession = rescueAttach.sessionId;
+  await send("Page.enable", {}, rescueSession);
+  await send("Runtime.enable", {}, rescueSession);
+  await send("Page.addScriptToEvaluateOnNewDocument", {
+    source: `if (location.protocol === 'file:') { localStorage.setItem('fx-simulator-save-v1', ${JSON.stringify(JSON.stringify(rescueState))}); }`
+  }, rescueSession);
+  const rescueLoaded = waitForEvent("Page.loadEventFired", rescueSession);
+  await send("Page.navigate", { url: pathToFileURL(path.join(root, "index.html")).href }, rescueSession);
+  await rescueLoaded;
+  check("rescue option is initially hidden on the game-over screen", await evaluate("!document.getElementById('gameOverOverlay').classList.contains('hidden') && document.getElementById('stealMoneyBtn').classList.contains('hidden')", rescueSession));
+  await new Promise((resolve) => setTimeout(resolve, 15500));
+  check("rescue option appears after 15 seconds", await evaluate("!document.getElementById('stealMoneyBtn').classList.contains('hidden')", rescueSession));
+  await evaluate("document.getElementById('stealMoneyBtn').click()", rescueSession);
+  const rescued = await evaluate("JSON.parse(localStorage.getItem('fx-simulator-save-v1'))", rescueSession);
+  check("rescue restores play and adds an interest-free lowest-priority loan", rescued.status === "playing" && rescued.wallet === 3000000 && rescued.rescueUsed === true && rescued.loans.some((loan) => loan.noInterest && loan.lowestPriority && loan.principal === 3000000) && await evaluate("document.getElementById('gameOverOverlay').classList.contains('hidden')", rescueSession));
+  check("no uncaught browser runtime errors after rescue", runtimeErrors.length === 0);
 
   console.log(`\n${checks} browser checks passed. Screenshot saved to screenshot.png.`);
   await send("Browser.close");

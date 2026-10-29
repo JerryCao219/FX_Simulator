@@ -4,9 +4,9 @@
   const snapshot = {
     date: "2025-01-02",
     source: "European Central Bank reference rates via Frankfurter",
-    url: "https://api.frankfurter.app/2025-01-02?from=EUR&to=USD,JPY,GBP,CHF,HKD,CNY",
+    url: "https://api.frankfurter.app/2025-01-02?from=EUR&to=USD,JPY,GBP,CHF,HKD,CNY,AUD",
     base: "EUR",
-    rates: { USD: 1.0321, JPY: 162.04, GBP: 0.83118, CHF: 0.9371, HKD: 8.0261, CNY: 7.5338 }
+    rates: { USD: 1.0321, JPY: 162.04, GBP: 0.83118, CHF: 0.9371, HKD: 8.0261, CNY: 7.5338, AUD: 1.6618 }
   };
 
   const snapshots = [
@@ -108,8 +108,32 @@
     }
   ];
 
+  const audRatesByDate = {
+    "2019-01-02": 1.6273,
+    "2019-06-03": 1.6077,
+    "2020-01-02": 1.6006,
+    "2020-06-01": 1.6488,
+    "2021-01-04": 1.5928,
+    "2021-06-01": 1.5793,
+    "2022-01-03": 1.5691,
+    "2022-06-01": 1.4861,
+    "2022-12-01": 1.5377,
+    "2023-06-01": 1.6407,
+    "2023-12-01": 1.6448,
+    "2024-01-02": 1.6147,
+    "2024-06-03": 1.629,
+    "2024-12-02": 1.6211,
+    "2025-01-02": 1.6618,
+    "2025-02-03": 1.6671,
+    "2025-06-02": 1.7606,
+    "2025-08-01": 1.7756,
+    "2025-10-01": 1.7741,
+    "2025-12-01": 1.774
+  };
+
   function priceAtSnapshot(symbol, selectedSnapshot) {
-    const rates = (selectedSnapshot || snapshot).rates;
+    const activeSnapshot = selectedSnapshot || snapshot;
+    const rates = activeSnapshot.rates;
     const formulas = {
       "USD/JPY": () => rates.JPY / rates.USD,
       "EUR/JPY": () => rates.JPY,
@@ -119,7 +143,8 @@
       "GBP/USD": () => rates.USD / rates.GBP,
       "HKD/CNY": () => rates.CNY / rates.HKD,
       "HKD/USD": () => rates.USD / rates.HKD,
-      "HKD/JPY": () => rates.JPY / rates.HKD
+      "HKD/JPY": () => rates.JPY / rates.HKD,
+      "JPY/AUD": () => audRatesByDate[activeSnapshot.date] / rates.JPY
     };
     if (!formulas[symbol]) throw new Error("Unknown snapshot pair: " + symbol);
     return formulas[symbol]();
@@ -197,16 +222,25 @@
       initial: 20.18913295373843,
       volatility: 0.00013,
       precision: 3
+    },
+    {
+      symbol: "JPY/AUD",
+      base: "JPY",
+      quote: "AUD",
+      initial: 1.6618 / 162.04,
+      volatility: 0.00011,
+      precision: 6
     }
   ];
 
   const data = {
     startingCash: 100000000,
-    startingCashChoices: [3000000, 10000000, 20000000, 50000000, 100000000, 200000000],
+    startingCashChoices: [300000, 3000000, 10000000, 20000000, 50000000, 100000000, 200000000],
     maxLeverage: 1000,
     minTradeMargin: 100,
     maxLoanPrincipal: 500000000,
     loanLimitsByCapital: {
+      300000: 3000000,
       3000000: 30000000,
       10000000: 50000000,
       20000000: 80000000,

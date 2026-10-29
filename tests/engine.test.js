@@ -43,7 +43,7 @@ test("new game preserves the ¥100m total and locks the selected mode", () => {
   assert.equal(state.wallet, 75000000);
   assert.equal(state.balance, 25000000);
   assert.equal(Engine.accountTotals(state).netWorth, 100000000);
-  assert.equal(Object.keys(state.markets).length, 9);
+  assert.equal(Object.keys(state.markets).length, 10);
 });
 
 test("opening a position reserves isolated margin and calculates base units", () => {
@@ -223,7 +223,7 @@ test("selected starting capital controls wallet and trading allocation", () => {
   assert.equal(Engine.accountTotals(state).netWorth, 20000000);
 });
 
-test("new games randomly select a historical snapshot for all nine pairs", () => {
+test("new games randomly select a historical snapshot for all ten pairs", () => {
   const state = Engine.createGame("classic", 1000000, 1735689600000, () => 0.999999, 10000000);
   const selected = Data.snapshots[Data.snapshots.length - 1];
   assert.equal(state.snapshotDate, selected.date);
@@ -256,7 +256,7 @@ test("version 1 saves migrate with HKD markets and preserve existing funds", () 
   assert.deepEqual(state.loans, []);
   assert.equal(state.status, "playing");
   assert.equal(state.balance, balance);
-  assert.equal(Object.keys(state.markets).length, 9);
+  assert.equal(Object.keys(state.markets).length, 10);
 });
 
 test("the snapshot library contains exactly 20 ECB reference dates", () => {
@@ -386,8 +386,9 @@ test("bankruptcy checks include open-position equity before declaring failure", 
   assert.equal(result.liquidFunds, 0);
 });
 
-test("loan limits follow the six starting-capital tiers", () => {
+test("loan limits follow the seven starting-capital tiers", () => {
   const cases = [
+    [300000, 3000000],
     [3000000, 30000000],
     [10000000, 50000000],
     [20000000, 80000000],
@@ -396,7 +397,7 @@ test("loan limits follow the six starting-capital tiers", () => {
     [200000000, 1000000000]
   ];
   cases.forEach(([capital, limit]) => {
-    const state = Engine.createGame("classic", 1000000, 1735689600000, () => 0.5, capital);
+    const state = Engine.createGame("classic", Math.min(1000000, capital), 1735689600000, () => 0.5, capital);
     assert.equal(Engine.loanLimit(state), limit);
     assert.equal(Engine.loanTotals(state).availableCredit, limit);
   });
@@ -416,6 +417,69 @@ test("older loan saves migrate to 120-second interest and 600-second maturity", 
   assert.equal(state.version, 4);
   assert.equal(loan.nextInterestAt, loan.borrowedAt + 240000);
   assert.equal(loan.dueAt, loan.borrowedAt + 600000);
+});
+
+test("JPY/AUD converts AUD-denominated P&L back to JPY", () => {
+  const state = game();
+  const position = open(state, { symbol: "JPY/AUD", margin: 1000000, leverage: 10 });
+  const prices = Engine.currentPrices(state);
+  const entry = prices["JPY/AUD"];
+  prices["JPY/AUD"] = entry * 1.01;
+  const expected = position.units * (prices["JPY/AUD"] - entry) / prices["JPY/AUD"];
+  approx(Engine.calculatePnl(position, prices), expected);
+});
+
+test("additional margin moves long liquidation down and short liquidation up", () => {
+  const longState = game();
+  const longPosition = open(longState);
+  const oldLongLine = Engine.liquidationPrice(longPosition, Engine.currentPrices(longState));
+  const added = Engine.addMargin(longState, longPosition.id, 500000);
+  assert.equal(added.ok, true);
+  assert.equal(longPosition.margin, 1500000);
+  assert.equal(longState.balance, 8500000);
+  assert.ok(Engine.liquidationPrice(longPosition, Engine.currentPrices(longState)) < oldLongLine);
+
+  const shortState = game();
+  const shortPosition = open(shortState, { side: "short" });
+  const oldShortLine = Engine.liquidationPrice(shortPosition, Engine.currentPrices(shortState));
+  assert.equal(Engine.addMargin(shortState, shortPosition.id, 500000).ok, true);
+  assert.ok(Engine.liquidationPrice(shortPosition, Engine.currentPrices(shortState)) > oldShortLine);
+});
+
+test("rescue money is interest-free, restores play, and is repaid last", () => {
+  const state = game();
+  const normalLoan = Engine.borrowLoan(state, 1000000).loan;
+  state.status = "gameOver";
+  state.wallet = 0;
+  const rescue = Engine.stealMoney(state);
+  assert.equal(rescue.ok, true);
+  assert.equal(state.status, "playing");
+  assert.equal(state.wallet, 3000000);
+  assert.equal(rescue.loan.noInterest, true);
+  assert.equal(rescue.loan.lowestPriority, true);
+  assert.equal(Engine.repayDebt(state, 1000000).ok, true);
+  assert.equal(state.loans.some((loan) => loan.id === normalLoan.id), false);
+  assert.equal(rescue.loan.principal, 3000000);
+  state.simTime += 10000000;
+  const result = Engine.processLoans(state);
+  assert.equal(result.interestCount, 0);
+  assert.equal(rescue.loan.interest, 0);
+  assert.equal(rescue.loan.dueAt, null);
+});
+
+test("rescue is limited to once per run even after full repayment", () => {
+  const state = game();
+  state.status = "gameOver";
+  assert.equal(Engine.stealMoney(state).ok, true);
+  assert.equal(state.rescueUsed, true);
+  assert.equal(Engine.repayDebt(state, 3000000).ok, true);
+  assert.equal(state.loans.length, 0);
+  state.status = "gameOver";
+  const second = Engine.stealMoney(state);
+  assert.equal(second.ok, false);
+  assert.equal(second.error, "rescueAlreadyUsed");
+  assert.equal(state.loans.length, 0);
+  assert.equal(state.rescueUsed, true);
 });
 
 console.log(`\n${passed} tests passed.`);

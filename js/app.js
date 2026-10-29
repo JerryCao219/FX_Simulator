@@ -15,11 +15,12 @@
   let toastTimer = null;
   let accumulator = 0;
   let lastSchedulerTime = Date.now();
+  let gameOverRevealTimer = null;
 
   const text = {
     zh: {
       startEyebrow: "单人外汇交易模拟", startTitle: "选择你的交易规则", startSubtitle: "选择本局资金与交易模式。模式选定后将锁定，直到重新开始。",
-      startingCapital: "本局初始资金", startingCapitalHelp: "可选 300 万至 2 亿日元；开局汇率将从 20 组历史快照中随机抽取。", fundManagement: "资金管理",
+      startingCapital: "本局初始资金", startingCapitalHelp: "可选 30 万至 2 亿日元；开局汇率将从 20 组历史快照中随机抽取。", fundManagement: "资金管理",
       gameMode: "游戏模式", classicMode: "经典模式", classicDescription: "仅市价开仓与手动平仓，完全依靠自己的判断。", marketOnly: "仅市价单",
       riskMode: "风控模式", riskDescription: "在市价交易基础上，可随时添加、修改或取消止盈止损。", marketRisk: "市价单＋止盈止损",
       initialDeposit: "初始投入交易账户", initialDepositHelp: "剩余资金保留在钱包，之后可随时追加或提取。", startGame: "开始新游戏",
@@ -34,7 +35,7 @@
       deposit: "钱包 → 交易账户", withdraw: "交易账户 → 钱包", openPositionsEyebrow: "当前交易", openPositions: "持仓列表",
       isolatedMargin: "每笔仓位独立保证金，亏完全部保证金时强平", market: "市场 / 方向", marginLeverage: "保证金 / 杠杆",
       entryCurrent: "开仓价 / 当前价", pnlRoe: "盈亏 / 收益率", actions: "操作", noPositions: "暂无持仓。选择方向、保证金和杠杆后即可开仓。",
-      selectedPosition: "选中仓位", riskHint: "留空表示不设置；止盈止损必须在当前价格的正确一侧。", stopLossPrice: "止损价", takeProfitPrice: "止盈价",
+      selectedPosition: "选中仓位", positionSupport: "仓位管理", addMarginHint: "追加保证金不会改变持仓数量；做多强平线下降，做空强平线上升，降低强平风险。", additionalMargin: "追加保证金（日元）", addMargin: "追加到选中仓位", marginAdded: "已追加 {amount} 保证金，新强平价为 {price}。", riskHint: "留空表示不设置；止盈止损必须在当前价格的正确一侧。", stopLossPrice: "止损价", takeProfitPrice: "止盈价",
       saveRisk: "保存止盈止损", clearRisk: "清除", closedTrades: "已平仓交易", winRate: "胜率", realizedPnl: "已实现净盈亏",
       totalFees: "累计手续费", liquidations: "爆仓次数", auditTrail: "交易记录", tradeHistory: "平仓历史", historyHint: "保留最近 500 笔记录",
       closeTime: "平仓时间", entryExit: "开仓 / 平仓", grossPnl: "盈亏（费前）", fee: "手续费", netPnl: "净盈亏", closeReason: "平仓原因",
@@ -49,6 +50,7 @@
       invalidLoanAmount: "单笔借款不得低于 1000 日元。", loanLimitExceeded: "超出本局初始资金对应的贷款总额度。", noDebt: "当前没有需要偿还的债务。",
       invalidRepayment: "请输入有效的还款金额。", insufficientRepayment: "钱包与交易账户可用余额不足以支付该还款。", gameOver: "本局已经结束，请重新开始。",
       debtDefault: "债务违约", gameOverTitle: "本局游戏结束", gameOverHint: "贷款到期时，自动平仓后的可用资金仍不足以偿还债务。", gameOverMessage: "到期债务为 {amount}，可用资金不足，贷款期限为 600 模拟秒。",
+      stealMoney: "从久留美的父亲那里偷钱", rescueReceived: "已获得 300 万日元救助金，作为免息贷款计入债务，还款优先级最低。", interestFree: "免息·最后还款", rescueUnavailable: "当前不可使用该救助。", rescueAlreadyUsed: "本局救助只能使用一次，还清后也不会恢复。",
       fundsExhausted: "资金耗尽", insufficientFundsHint: "钱包、交易余额与全部持仓权益合计低于最低开仓金额，且仍存在未偿还贷款。", insufficientFundsMessage: "当前可变现总资产（含持仓权益）为 {cash}，低于最低开仓金额 {minimum}；未还债务为 {debt}。",
       long: "做多", short: "做空", close: "平仓", openLong: "市价买入 {symbol}", openShort: "市价卖出 {symbol}",
       available: "可用 {amount}", nextCandle: "下一根 K 线：{seconds} 模拟秒", simulatedTime: "模拟时间 {time}",
@@ -68,7 +70,7 @@
     },
     en: {
       startEyebrow: "Single-player FX trading simulation", startTitle: "Choose your trading rules", startSubtitle: "Choose your starting capital and mode. The mode is locked until you restart.",
-      startingCapital: "Starting capital", startingCapitalHelp: "Choose ¥3M to ¥200M. Each run randomly uses one of 20 historical FX snapshots.", fundManagement: "Fund management",
+      startingCapital: "Starting capital", startingCapitalHelp: "Choose ¥300K to ¥200M. Each run randomly uses one of 20 historical FX snapshots.", fundManagement: "Fund management",
       gameMode: "Game mode", classicMode: "Classic mode", classicDescription: "Market orders and manual closing only. Every exit is your own decision.", marketOnly: "Market orders only",
       riskMode: "Risk control mode", riskDescription: "Market trading plus optional stop-loss and take-profit levels that you can edit at any time.", marketRisk: "Market orders + SL/TP",
       initialDeposit: "Initial trading account deposit", initialDepositHelp: "The remainder stays in your wallet and can be transferred in either direction later.", startGame: "Start new game",
@@ -83,7 +85,7 @@
       deposit: "Wallet → Trading", withdraw: "Trading → Wallet", openPositionsEyebrow: "Current trading", openPositions: "Open positions",
       isolatedMargin: "Isolated margin; liquidated only when the full margin is lost", market: "Market / Side", marginLeverage: "Margin / Leverage",
       entryCurrent: "Entry / Current", pnlRoe: "P&L / ROE", actions: "Actions", noPositions: "No open positions. Choose a side, margin and leverage to trade.",
-      selectedPosition: "Selected position", riskHint: "Leave blank to disable. SL/TP must be on the valid side of the current price.", stopLossPrice: "Stop-loss price", takeProfitPrice: "Take-profit price",
+      selectedPosition: "Selected position", positionSupport: "Position management", addMarginHint: "Adding margin does not change position units. Long liquidation moves down and short liquidation moves up, reducing liquidation risk.", additionalMargin: "Additional margin (JPY)", addMargin: "Add to selected position", marginAdded: "Added {amount} margin. New liquidation price: {price}.", riskHint: "Leave blank to disable. SL/TP must be on the valid side of the current price.", stopLossPrice: "Stop-loss price", takeProfitPrice: "Take-profit price",
       saveRisk: "Save SL / TP", clearRisk: "Clear", closedTrades: "Closed trades", winRate: "Win rate", realizedPnl: "Realized net P&L",
       totalFees: "Total fees", liquidations: "Liquidations", auditTrail: "Audit trail", tradeHistory: "Trade history", historyHint: "Keeps the latest 500 trades",
       closeTime: "Close time", entryExit: "Entry / Exit", grossPnl: "Gross P&L", fee: "Fee", netPnl: "Net P&L", closeReason: "Close reason",
@@ -98,6 +100,7 @@
       invalidLoanAmount: "The minimum loan is ¥1,000.", loanLimitExceeded: "This exceeds the loan limit for the current starting capital.", noDebt: "There is no debt to repay.",
       invalidRepayment: "Enter a valid repayment amount.", insufficientRepayment: "Wallet and available trading cash are insufficient for this repayment.", gameOver: "This run has ended. Please restart.",
       debtDefault: "Debt default", gameOverTitle: "Game over", gameOverHint: "When the loan matured, your cash after automatic position settlement was insufficient to repay the debt.", gameOverMessage: "The matured debt was {amount}, exceeding available cash after the 600-second loan term.",
+      stealMoney: "Steal money from Kurumi's father", rescueReceived: "Received ¥3,000,000 as an interest-free rescue loan with the lowest repayment priority.", interestFree: "Interest-free · Repaid last", rescueUnavailable: "This rescue is not currently available.", rescueAlreadyUsed: "The rescue can be used only once per run and does not reset after repayment.",
       fundsExhausted: "Funds exhausted", insufficientFundsHint: "Wallet, trading cash and all open-position equity total less than the minimum opening margin while debt remains.", insufficientFundsMessage: "Liquidatable assets including open-position equity are {cash}, below the {minimum} minimum opening margin. Outstanding debt: {debt}.",
       long: "Long", short: "Short", close: "Close", openLong: "Market buy {symbol}", openShort: "Market sell {symbol}",
       available: "Available {amount}", nextCandle: "Next candle: {seconds} simulated seconds", simulatedTime: "Simulated time {time}",
@@ -163,7 +166,7 @@
   }
 
   function capitalOptionLabel(value) {
-    if (language === "en") return `¥${value / 1000000}M`;
+    if (language === "en") return value < 1000000 ? `¥${value / 1000}K` : `¥${value / 1000000}M`;
     return value >= 100000000 ? `${value / 100000000}亿日元` : `${value / 10000}万日元`;
   }
 
@@ -281,6 +284,7 @@
     }
     const mode = document.querySelector('input[name="gameMode"]:checked').value;
     state = Engine.createGame(mode, deposit, Date.now(), undefined, startingCash);
+    $("marginInput").value = Math.min(1000000, Math.max(Data.minTradeMargin, Math.floor(deposit)));
     state.language = language;
     selectedPositionId = null;
     tradeSide = "long";
@@ -392,6 +396,20 @@
     }).join("");
 
     const selected = state.positions.find((position) => position.id === selectedPositionId);
+    const marginEditor = $("marginEditor");
+    if (!selected) {
+      marginEditor.classList.add("hidden");
+      marginEditor.dataset.positionId = "";
+    } else {
+      marginEditor.classList.remove("hidden");
+      $("marginPositionTitle").textContent = `#${selected.id} · ${selected.symbol} · ${t(selected.side)} · ${selected.leverage}×`;
+      $("availableForAdditionalMargin").textContent = t("available", { amount: formatMoney(state.balance) });
+      if (marginEditor.dataset.positionId !== String(selected.id)) {
+        $("additionalMargin").value = Math.min(1000000, Math.max(Data.minTradeMargin, Math.floor(state.balance)));
+        $("marginError").textContent = "";
+        marginEditor.dataset.positionId = String(selected.id);
+      }
+    }
     const editor = $("riskEditor");
     if (state.mode !== "risk" || !selected) {
       editor.classList.add("hidden");
@@ -600,7 +618,7 @@
     $("loansBody").innerHTML = state.loans.slice().sort((a, b) => a.dueAt - b.dueAt || a.id - b.id).map((loan) => {
       const debt = loan.principal + loan.interest;
       const dueClass = loan.dueAt - state.simTime <= 300000 ? "loan-due-soon" : "";
-      return `<tr><td><strong>#${loan.id}</strong></td>` +
+      return `<tr><td><strong>#${loan.id}</strong>${loan.noInterest ? `<br><small class="muted">${t("interestFree")}</small>` : ""}</td>` +
         `<td class="mono">${formatMoney(loan.principal)}</td>` +
         `<td class="mono">${formatMoney(loan.interest)}</td>` +
         `<td class="mono"><strong>${formatMoney(debt)}</strong></td>` +
@@ -612,7 +630,22 @@
   function renderGameOver() {
     const isOver = state.status === "gameOver";
     $("gameOverOverlay").classList.toggle("hidden", !isOver);
-    if (!isOver) return;
+    if (!isOver) {
+      if (gameOverRevealTimer !== null) clearTimeout(gameOverRevealTimer);
+      gameOverRevealTimer = null;
+      $("stealMoneyBtn").classList.add("hidden");
+      return;
+    }
+    if (state.rescueUsed) {
+      if (gameOverRevealTimer !== null) clearTimeout(gameOverRevealTimer);
+      gameOverRevealTimer = null;
+      $("stealMoneyBtn").classList.add("hidden");
+    } else if (gameOverRevealTimer === null && $("stealMoneyBtn").classList.contains("hidden")) {
+      gameOverRevealTimer = setTimeout(() => {
+        $("stealMoneyBtn").classList.remove("hidden");
+        gameOverRevealTimer = null;
+      }, 15000);
+    }
     const insufficientFunds = state.gameOverReason === "insufficientFunds";
     $("gameOverReasonLabel").textContent = t(insufficientFunds ? "fundsExhausted" : "debtDefault");
     $("gameOverHintText").textContent = t(insufficientFunds ? "insufficientFundsHint" : "gameOverHint");
@@ -707,6 +740,24 @@
     renderAll();
   }
 
+  function addMarginToPosition() {
+    if (!selectedPositionId) {
+      showError("marginError", "noSelectedPosition");
+      return;
+    }
+    showError("marginError", null);
+    const result = Engine.addMargin(state, selectedPositionId, $("additionalMargin").value);
+    if (!result.ok) {
+      showError("marginError", result.error);
+      return;
+    }
+    Engine.checkCriticalFunds(state);
+    saveState();
+    const liquidation = Engine.liquidationPrice(result.position, Engine.currentPrices(state));
+    showToast(t("marginAdded", { amount: formatMoney(result.amount), price: formatPrice(result.position.symbol, liquidation) }));
+    renderAll();
+  }
+
   function borrowLoan() {
     showError("loanError", null);
     const result = Engine.borrowLoan(state, $("loanAmount").value);
@@ -731,6 +782,17 @@
     Engine.checkCriticalFunds(state);
     saveState();
     showToast(t("loanRepaid", { amount: formatMoney(result.paid), debt: formatMoney(result.remainingDebt) }));
+    renderAll();
+  }
+
+  function claimRescueLoan() {
+    const result = Engine.stealMoney(state);
+    if (!result.ok) {
+      showToast(t(result.error), true);
+      return;
+    }
+    saveState();
+    showToast(t("rescueReceived"));
     renderAll();
   }
 
@@ -802,6 +864,7 @@
     $("repayBtn").addEventListener("click", () => repayLoan(false));
     $("repayAllBtn").addEventListener("click", () => repayLoan(true));
     $("gameOverRestart").addEventListener("click", restart);
+    $("stealMoneyBtn").addEventListener("click", claimRescueLoan);
     $("positionsBody").addEventListener("click", (event) => {
       const closeButton = event.target.closest("[data-close-id]");
       if (closeButton) {
@@ -817,6 +880,13 @@
     });
     $("saveRiskBtn").addEventListener("click", () => updateRisk(false));
     $("clearRiskBtn").addEventListener("click", () => updateRisk(true));
+    $("addMarginBtn").addEventListener("click", addMarginToPosition);
+    document.querySelector(".additional-margin-shortcuts").addEventListener("click", (event) => {
+      const amountButton = event.target.closest("[data-additional-margin]");
+      const maxButton = event.target.closest("[data-additional-margin-max]");
+      if (amountButton) $("additionalMargin").value = amountButton.dataset.additionalMargin;
+      if (maxButton) $("additionalMargin").value = Engine.roundMoney(state.balance);
+    });
     $("pauseBtn").addEventListener("click", () => {
       state.paused = !state.paused;
       accumulator = 0;
